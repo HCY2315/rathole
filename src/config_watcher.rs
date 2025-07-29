@@ -99,10 +99,12 @@ pub struct ConfigWatcherHandle {
 
 impl ConfigWatcherHandle {
     pub async fn new(path: &Path, shutdown_rx: broadcast::Receiver<bool>) -> Result<Self> {
+        // 多生产者、单消费者的无界通道
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let origin_cfg = Config::from_file(path).await?;
 
         // Initial start
+        // Box::new 将一个数据从“栈（Stack）”转移到“堆（Heap）”上，并返回一个指向该数据的指针
         event_tx
             .send(ConfigChange::General(Box::new(origin_cfg.clone())))
             .unwrap();

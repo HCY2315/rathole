@@ -225,11 +225,13 @@ pub struct ServerConfig {
     pub services: HashMap<String, ServerServiceConfig>,
     #[serde(default)]
     pub transport: TransportConfig,
+    // 默认执行 default_heartbeat_interval 函数获取参数
     #[serde(default = "default_heartbeat_interval")]
     pub heartbeat_interval: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+// 拒绝未知字段
 #[serde(deny_unknown_fields)]
 pub struct Config {
     pub server: Option<ServerConfig>,

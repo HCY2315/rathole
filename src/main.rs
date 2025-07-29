@@ -9,7 +9,10 @@ async fn main() -> Result<()> {
     let args = Cli::parse();
 
     let (shutdown_tx, shutdown_rx) = broadcast::channel::<bool>(1);
+
+    // 开启后台任务
     tokio::spawn(async move {
+        // 这行代码会阻塞（暂停）当前这个后台任务，直到你按下键盘上的 Ctrl+C。
         if let Err(e) = signal::ctrl_c().await {
             // Something really weird happened. So just panic
             panic!("Failed to listen for the ctrl-c signal: {:?}", e);
@@ -22,6 +25,10 @@ async fn main() -> Result<()> {
         }
     });
 
+    // 条件编译（Conditional Compilation）属性指令
+    // ====================
+    // 只有当开启了名为 console 的功能插件（Feature）时，这段代码才会生效；
+    // 否则，编译器会完全忽略这段代码，就当它不存在一样。
     #[cfg(feature = "console")]
     {
         console_subscriber::init();

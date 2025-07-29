@@ -40,6 +40,7 @@ fn get_str_from_keypair_type(curve: KeypairType) -> &'static str {
 #[cfg(feature = "noise")]
 fn genkey(curve: Option<KeypairType>) -> Result<()> {
     let curve = curve.unwrap_or(DEFAULT_CURVE);
+    // .parse(): 尝试将这个字符串解析为 snowstorm 库内部定义的 NoiseParams（协议参数）类型。
     let builder = snowstorm::Builder::new(
         format!(
             "Noise_KK_{}_ChaChaPoly_BLAKE2s",
@@ -65,6 +66,7 @@ pub async fn run(args: Cli, shutdown_rx: broadcast::Receiver<bool>) -> Result<()
     }
 
     // Raise `nofile` limit on linux and mac
+    // 提升当前进程可以打开的文件描述符（File Descriptor）数量限制。
     fdlimit::raise_fd_limit();
 
     // Spawn a config watcher. The watcher will send a initial signal to start the instance with a config

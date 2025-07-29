@@ -10,6 +10,9 @@ readme = "README.md"
 build = "build.rs"
 include = ["src/**/*", "LICENSE", "README.md", "build.rs"]
 
+[profile.dev.package."*"]
+opt-level = 3         # 关键点：将第三方依赖包开启最高优化（只需编译一次，后续运行极快）
+
 [features]
 default = [
     "server",
@@ -67,6 +70,11 @@ console = ["console-subscriber", "tokio/tracing"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [profile.dev]
 panic = "abort"
+## 在 Cargo.toml 中优化开发模式
+#[profile.dev]
+opt-level = 0         # 开发模式不开启代码优化
+debug = true          # 保持调试信息
+split-debuginfo = "unpacked" # macOS/Linux 推荐，减少打包调试信息的时间
 
 [profile.release]
 panic = "abort"
