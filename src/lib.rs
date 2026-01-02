@@ -69,7 +69,7 @@ pub async fn run(args: Cli, shutdown_rx: broadcast::Receiver<bool>) -> Result<()
     // 提升当前进程可以打开的文件描述符（File Descriptor）数量限制。
     fdlimit::raise_fd_limit();
 
-    // Spawn a config watcher. The watcher will send a initial signal to start the instance with a config
+    // Spawn a config watcher. The watcher will send an initial signal to start the instance with a config
     let config_path = args.config_path.as_ref().unwrap();
     let mut cfg_watcher = ConfigWatcherHandle::new(config_path, shutdown_rx).await?;
 
