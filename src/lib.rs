@@ -74,9 +74,11 @@ pub async fn run(args: Cli, shutdown_rx: broadcast::Receiver<bool>) -> Result<()
     let mut cfg_watcher = ConfigWatcherHandle::new(config_path, shutdown_rx).await?;
 
     // shutdown_tx owns the instance
+    // shutdown_tx.subscribe() 派生出新的接收端
     let (shutdown_tx, _) = broadcast::channel(1);
 
     // (The join handle of the last instance, The service update channel sender)
+    // 在 Rust 异步编程中用于追踪和管理一个 正在运行中 的后台任务实例
     let mut last_instance: Option<(tokio::task::JoinHandle<_>, mpsc::Sender<ConfigChange>)> = None;
 
     while let Some(e) = cfg_watcher.event_rx.recv().await {

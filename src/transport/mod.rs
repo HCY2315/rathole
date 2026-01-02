@@ -70,17 +70,28 @@ pub trait Transport: Debug + Send + Sync {
 mod tcp;
 pub use tcp::TcpTransport;
 
-#[cfg(all(feature = "native-tls", feature = "rustls"))]
-compile_error!("Only one of `native-tls` and `rustls` can be enabled");
+// #[cfg(all(feature = "native-tls", feature = "rustls"))]
+// compile_error!("Only one of `native-tls` and `rustls` can be enabled");
 
-#[cfg(feature = "native-tls")]
-mod native_tls;
-#[cfg(feature = "native-tls")]
-use native_tls as tls;
-#[cfg(feature = "rustls")]
-mod rustls;
-#[cfg(feature = "rustls")]
-use rustls as tls;
+// #[cfg(feature = "native-tls")]
+// mod native_tls;
+// #[cfg(feature = "native-tls")]
+// use native_tls as tls;
+// #[cfg(feature = "rustls")]
+// mod rustls;
+// #[cfg(feature = "rustls")]
+// use rustls as tls;
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "rustls")] {
+        mod rustls;
+        use rustls as tls;
+    } else if #[cfg(feature = "native-tls")] {
+        mod native_tls;
+        use native_tls as tls;
+    }
+}
+
 
 #[cfg(any(feature = "native-tls", feature = "rustls"))]
 pub(crate) use tls::TlsTransport;
@@ -92,6 +103,8 @@ pub use noise::NoiseTransport;
 
 #[cfg(any(feature = "websocket-native-tls", feature = "websocket-rustls"))]
 mod websocket;
+// mod native_tls;
+
 #[cfg(any(feature = "websocket-native-tls", feature = "websocket-rustls"))]
 pub use websocket::WebsocketTransport;
 
