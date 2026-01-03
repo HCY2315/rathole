@@ -18,8 +18,8 @@ pub struct TcpTransport {
 #[async_trait]
 impl Transport for TcpTransport {
     type Acceptor = TcpListener;
-    type Stream = TcpStream;
     type RawStream = TcpStream;
+    type Stream = TcpStream;
 
     fn new(config: &TransportConfig) -> Result<Self> {
         Ok(TcpTransport {
@@ -37,6 +37,7 @@ impl Transport for TcpTransport {
     }
 
     async fn accept(&self, a: &Self::Acceptor) -> Result<(Self::RawStream, SocketAddr)> {
+        //  调用监听器，等待返回元组
         let (s, addr) = a.accept().await?;
         self.socket_opts.apply(&s);
         Ok((s, addr))

@@ -79,19 +79,25 @@ pub async fn run(args: Cli, shutdown_rx: broadcast::Receiver<bool>) -> Result<()
 
     // (The join handle of the last instance, The service update channel sender)
     // 在 Rust 异步编程中用于追踪和管理一个 正在运行中 的后台任务实例
+    // 实现“单例任务管理”或“新旧任务替换”
     let mut last_instance: Option<(tokio::task::JoinHandle<_>, mpsc::Sender<ConfigChange>)> = None;
 
     while let Some(e) = cfg_watcher.event_rx.recv().await {
         match e {
             ConfigChange::General(config) => {
+                // 任务异步的句柄。通过它你可以监控任务是否结束、等待它结束，或者强制杀死（abort）该任务
+                // 如果last_instance 是Some（即里面有数据），就执行大括号里的逻辑
                 if let Some((i, _)) = last_instance {
                     info!("General configuration change detected. Restarting...");
                     shutdown_tx.send(true)?;
+                    // 第一个?：等待JoinHandle本身的结果。如果任务因为恐慌（Panic）或者被强制中止而失败，这里会捕获JoinError。
+                    // 第二个?：如果任务内部返回的Result类型，这层?用于提取任务实际执行结果中的错误。
                     i.await??;
                 }
 
                 debug!("{:?}", config);
 
+                // 多生产者，单消费者
                 let (service_update_tx, service_update_rx) = mpsc::channel(1024);
 
                 last_instance = Some((

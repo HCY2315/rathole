@@ -99,18 +99,21 @@ struct Server<T: Transport> {
 
     // `[server.services]` config, indexed by ServiceDigest
     services: Arc<RwLock<HashMap<ServiceDigest, ServerServiceConfig>>>,
-    // Collection of contorl channels
+    // Collection of control channels
     control_channels: Arc<RwLock<ControlChannelMap<T>>>,
     // Wrapper around the transport layer
     transport: Arc<T>,
 }
 
 // Generate a hash map of services which is indexed by ServiceDigest
+// 将“适合人类阅读”的配置转换为“适合机器快速查找”的指纹索引。
 fn generate_service_hashmap(
     server_config: &ServerConfig,
 ) -> HashMap<ServiceDigest, ServerServiceConfig> {
     let mut ret = HashMap::new();
     for u in &server_config.services {
+        // u.0.as_bytes()将这个字符串转为字节存储，然后计算摘要
+
         ret.insert(protocol::digest(u.0.as_bytes()), (*u.1).clone());
     }
     ret
@@ -119,6 +122,7 @@ fn generate_service_hashmap(
 impl<T: 'static + Transport> Server<T> {
     // Create a server from `[server]`
     pub async fn from(config: ServerConfig) -> Result<Server<T>> {
+        // 允许该配置在线程或任务间安全地多次共享，而不需要多次复制整个数据配置
         let config = Arc::new(config);
         let services = Arc::new(RwLock::new(generate_service_hashmap(&config)));
         let control_channels = Arc::new(RwLock::new(ControlChannelMap::new()));
@@ -146,6 +150,7 @@ impl<T: 'static + Transport> Server<T> {
         info!("Listening at {}", self.config.bind_addr);
 
         // Retry at least every 100ms
+        // 处理暂时性故障（如网络抖动、服务器临时过载）的算法
         let mut backoff = ExponentialBackoff {
             max_interval: Duration::from_millis(100),
             max_elapsed_time: None,
@@ -180,8 +185,10 @@ impl<T: 'static + Transport> Server<T> {
                             backoff.reset();
 
                             // Do transport handshake with a timeout
+                            // 为网络连接的“握手”过程设置一个限时强制取消机制
                             match time::timeout(Duration::from_secs(HANDSHAKE_TIMEOUT), self.transport.handshake(conn)).await {
                                 Ok(conn) => {
+                                    // 如果握手本身失败了（比如证书不对），它会在原有的错误信息前面加上一行提示："Failed to do transport handshake"。
                                     match conn.with_context(|| "Failed to do transport handshake") {
                                         Ok(conn) => {
                                             let services = self.services.clone();
@@ -254,8 +261,10 @@ async fn handle_connection<T: 'static + Transport>(
     server_config: Arc<ServerConfig>,
 ) -> Result<()> {
     // Read hello
+    // 读取连接开头的标识数据。根据返回的 hello 枚举值
     let hello = read_hello(&mut conn).await?;
     match hello {
+        // 用于传输指令（如：服务端通知客户端“现在有用户访问，请新开一个数据连接”）、心跳检测以及服务注册
         ControlChannelHello(_, service_digest) => {
             do_control_channel_handshake(
                 conn,
@@ -266,6 +275,7 @@ async fn handle_connection<T: 'static + Transport>(
             )
             .await?;
         }
+        // 负责真正的数据透传（流量转发）
         DataChannelHello(_, nonce) => {
             do_data_channel_handshake(conn, control_channels, nonce).await?;
         }

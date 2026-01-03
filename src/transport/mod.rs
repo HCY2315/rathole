@@ -119,6 +119,7 @@ struct Keepalive {
 #[derive(Debug, Clone, Copy)]
 pub struct SocketOpts {
     // None means do not change
+    // 是否禁用 Nagle 算法
     nodelay: Option<bool>,
     // keepalive must be Some or None at the same time, or the behavior will be platform-dependent
     keepalive: Option<Keepalive>,

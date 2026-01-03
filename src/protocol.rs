@@ -175,11 +175,16 @@ lazy_static! {
     static ref PACKET_LEN: PacketLength = PacketLength::new();
 }
 
+// 握手校验（Handshake Verification）逻辑，是客户端与服务端建立连接后的第一步安全与兼容性检查
 pub async fn read_hello<T: AsyncRead + AsyncWrite + Unpin>(conn: &mut T) -> Result<Hello> {
     let mut buf = vec![0u8; PACKET_LEN.hello];
+
+    // 从网络流中精确读取固定长度
     conn.read_exact(&mut buf)
         .await
         .with_context(|| "Failed to read hello")?;
+
+    // bincode 在反序列化时，会自动根据数据中的“标记位”恢复出具体的枚举分支。
     let hello = bincode::deserialize(&buf).with_context(|| "Failed to deserialize hello")?;
 
     match hello {
