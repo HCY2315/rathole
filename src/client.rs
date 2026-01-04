@@ -415,10 +415,19 @@ impl<T: 'static + Transport> ControlChannel<T> {
 
         // Send hello
         debug!("Sending hello");
-        let hello_send =
-            Hello::ControlChannelHello(CURRENT_PROTO_VERSION, self.digest[..].try_into().unwrap());
+
+        // self.digest[..]: 将 digest（通常是一个 Vec<u8> 或数组）切片化，取其全部内容。
+        // .try_into(): 尝试将这个切片转换成目标类型
+        let hello_send = ControlChannelHello(CURRENT_PROTO_VERSION, self.digest[..].try_into().unwrap());
+
+        // write_all: 这是一个比 write 更安全的方法。在网络传输中，有时因为缓冲区满了，一次只能发出一部分数据。
+        // write_all 会在底层自动循环，直到把所有字节全部发送完毕或者遇到无法恢复的错误为止
         conn.write_all(&bincode::serialize(&hello_send).unwrap())
             .await?;
+
+        // 刷新缓存：为了提高性能，系统或库（如 BufWriter）往往会先把多次小规模的写入操作积累在一个内存缓冲区里，等攒够了一定数量再一次性发出。
+        // flush() 的作用就是告诉程序：“别等了，现在就把缓冲区里所有的东西都推给操作系统内核。”
+        // 确保送达内核：调用 flush() 保证了所有之前通过 write 写入的数据已经离开了当前程序的内存，成功递交给了操作系统的 TCP 协议栈。
         conn.flush().await?;
 
         // Read hello
@@ -433,6 +442,8 @@ impl<T: 'static + Transport> ControlChannel<T> {
         // Send auth
         debug!("Sending auth");
         let mut concat = Vec::from(self.service.token.as_ref().unwrap().as_bytes());
+
+        // 将变量 nonce 中的所有字节追加（拷贝）到名为 concat 的字节数组（通常是 Vec<u8>）的末尾
         concat.extend_from_slice(&nonce);
 
         let session_key = protocol::digest(&concat);
@@ -505,8 +516,11 @@ impl ControlChannelHandle {
         let digest = protocol::digest(service.name.as_bytes());
 
         info!("Starting {}", hex::encode(digest));
+
+        // 创建一个只能发送一个值的通道
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
+        // 创建一个可变的退避控制器 retry_backoff，用于管理任务失败后的重试间隔时间
         let mut retry_backoff = run_control_chan_backoff(service.retry_interval.unwrap());
 
         let mut s = ControlChannel {
@@ -522,6 +536,7 @@ impl ControlChannelHandle {
             async move {
                 let mut start = Instant::now();
 
+                // 客户端执行的核心部分 run()
                 while let Err(err) = s
                     .run()
                     .await

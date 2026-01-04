@@ -21,6 +21,7 @@ pub fn try_set_tcp_keepalive(
     keepalive_duration: Duration,
     keepalive_interval: Duration,
 ) -> Result<()> {
+    // socket2 库获取一个现有网络连接（如 TcpStream）的底层“引用”
     let s = SockRef::from(conn);
     let keepalive = TcpKeepalive::new()
         .with_time(keepalive_duration)
@@ -32,6 +33,7 @@ pub fn try_set_tcp_keepalive(
         keepalive_interval
     );
 
+    // 向操作系统提交最终的 TCP 保活（Keepalive）配置，并处理可能出现的错误
     Ok(s.set_tcp_keepalive(&keepalive)?)
 }
 
@@ -112,6 +114,7 @@ pub async fn tcp_connect_with_proxy(
     addr: &AddrMaybeCached,
     proxy: Option<&Url>,
 ) -> Result<TcpStream> {
+    // 如果存在代理连接，则使用代理进行内网穿透
     if let Some(url) = proxy {
         let addr = &addr.addr;
         let mut s = TcpStream::connect((
@@ -153,6 +156,7 @@ pub async fn tcp_connect_with_proxy(
         Ok(s)
     } else {
         Ok(match addr.socket_addr {
+            //  用于发起一个异步的 TCP 连接请求，尝试连接到指定的地址 s
             Some(s) => TcpStream::connect(s).await?,
             None => TcpStream::connect(&addr.addr).await?,
         })

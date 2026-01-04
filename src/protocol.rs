@@ -22,6 +22,7 @@ pub enum Hello {
     DataChannelHello(ProtocolVersion, Digest),    // token provided by CreateDataChannel
 }
 
+// 元组结构体 (Tuple Struct)
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Auth(pub Digest);
 
@@ -221,6 +222,7 @@ pub async fn read_auth<T: AsyncRead + AsyncWrite + Unpin>(conn: &mut T) -> Resul
 
 pub async fn read_ack<T: AsyncRead + AsyncWrite + Unpin>(conn: &mut T) -> Result<Ack> {
     let mut bytes = vec![0u8; PACKET_LEN.ack];
+    // 从网络连接中读取“精确数量”的字节并填满提供的缓冲区。
     conn.read_exact(&mut bytes)
         .await
         .with_context(|| "Failed to read ack")?;

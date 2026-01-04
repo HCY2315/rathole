@@ -136,6 +136,7 @@ impl SocketOpts {
     /// Socket options for the control channel
     pub fn for_control_channel() -> SocketOpts {
         SocketOpts {
+            // 设置 true 后，程序会立即发送数据包，不再等待
             nodelay: Some(true),  // Always set nodelay for the control channel
             ..SocketOpts::none()  // None means do not change. Keepalive is set by TcpTransport
         }
@@ -168,8 +169,12 @@ impl SocketOpts {
     }
 
     pub fn apply(&self, conn: &TcpStream) {
+        // conn 会变化，它修改的是操作系统内核里的网络协议栈状态，而不是 Rust 内存里的数据
         if let Some(v) = self.keepalive {
+            // keepalive_duration (保活空闲时间)
             let keepalive_duration = Duration::from_secs(v.keepalive_secs);
+
+            // eepalive_interval (探测间隔时间)
             let keepalive_interval = Duration::from_secs(v.keepalive_interval);
 
             if let Err(e) = try_set_tcp_keepalive(conn, keepalive_duration, keepalive_interval)
