@@ -54,6 +54,8 @@ pub fn feature_neither_compile(feature1: &str, feature2: &str) -> ! {
 }
 
 pub async fn to_socket_addr<A: ToSocketAddrs>(addr: A) -> Result<SocketAddr> {
+    // 发起 DNS 查询。它会将类似 "example.com:8080" 的字符串发送给系统的 DNS 解析器
+    // .next() 获取下一个元素
     lookup_host(addr)
         .await?
         .next()

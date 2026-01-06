@@ -178,6 +178,7 @@ async fn do_data_channel_handshake<T: Transport>(
     args: Arc<RunDataChannelArgs<T>>,
 ) -> Result<T::Stream> {
     // Retry at least every 100ms, at most for 10 seconds
+    // 以“指数退避（Exponential Backoff）”的方式，尝试异步连接到远程服务器，并在失败时自动重连
     let backoff = ExponentialBackoff {
         max_interval: Duration::from_millis(100),
         max_elapsed_time: Some(Duration::from_secs(10)),
@@ -189,11 +190,14 @@ async fn do_data_channel_handshake<T: Transport>(
         backoff,
         || async {
             args.connector
+                // 1. 尝试建立 TCP/TLS 连接
                 .connect(&args.remote_addr)
                 .await
                 .with_context(|| format!("Failed to connect to {}", &args.remote_addr))
+                // 3. 标记为“临时错误” backoff::Error::transient: 这是一个关键信号。它告诉重试器：“这是一个临时故障（如网络闪断），请稍后重试
                 .map_err(backoff::Error::transient)
         },
+        // 通知回调（失败时做什么）
         |e, duration| {
             warn!("{:#}. Retry in {:?}", e, duration);
         },
@@ -476,6 +480,7 @@ impl<T: 'static + Transport> ControlChannel<T> {
 
         loop {
             tokio::select! {
+                // 分支 1：如果从连接中读到了控制命令, 命令为val，说明服务端正在访问客户端
                 val = read_control_cmd(&mut conn) => {
                     let val = val?;
                     debug!( "Received {:?}", val);
