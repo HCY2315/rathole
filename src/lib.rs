@@ -6,6 +6,7 @@ mod helper;
 mod multi_map;
 mod protocol;
 mod transport;
+mod db_config;
 
 pub use cli::Cli;
 use cli::KeypairType;
@@ -27,6 +28,7 @@ mod server;
 use server::run_server;
 
 use crate::config_watcher::{ConfigChange, ConfigWatcherHandle};
+use crate::db_config::DbConfigManager;
 
 const DEFAULT_CURVE: KeypairType = KeypairType::X25519;
 
@@ -65,11 +67,40 @@ pub async fn run(args: Cli, shutdown_rx: broadcast::Receiver<bool>) -> Result<()
         return genkey(args.genkey.unwrap());
     }
 
+    // If we are asked to save config from file to database, do that and exit
+    if args.db_config.is_some() && args.config_path.is_some() {
+        let db_path = args.db_config.as_ref().unwrap();
+        let config_path = args.config_path.as_ref().unwrap();
+
+        // Load config from file
+        let config = Config::from_file(config_path).await?;
+
+        // Save to database
+        let db_manager = DbConfigManager::new(db_path)?;
+        db_manager.save_config(&args.db_config_name, &config)?;
+
+        println!("Configuration saved to database: {}", db_path.display());
+        return Ok(());
+    }
+
     // Raise `nofile` limit on linux and mac
     // 提升当前进程可以打开的文件描述符（File Descriptor）数量限制。
     fdlimit::raise_fd_limit();
 
+    // Determine configuration source: file or database
+    let _config = if let Some(ref db_path) = args.db_config {
+        // Load config from database
+        let db_manager = DbConfigManager::new(db_path)?;
+        db_manager.load_config(&args.db_config_name)?
+            .ok_or_else(|| anyhow::anyhow!("Configuration '{}' not found in database", args.db_config_name))?
+    } else {
+        // Load config from file (original behavior)
+        let config_path = args.config_path.as_ref().unwrap();
+        Config::from_file(config_path).await?
+    };
+
     // Spawn a config watcher. The watcher will send an initial signal to start the instance with a config
+    // We'll still use the file path for config watcher, but config will be from either file or database
     let config_path = args.config_path.as_ref().unwrap();
     let mut cfg_watcher = ConfigWatcherHandle::new(config_path, shutdown_rx).await?;
 
@@ -130,6 +161,13 @@ async fn run_instance(
     shutdown_rx: broadcast::Receiver<bool>,
     service_update: mpsc::Receiver<ConfigChange>,
 ) -> Result<()> {
+    // If db_config is specified, also save to database
+    if let Some(ref db_path) = args.db_config {
+        // Save config to database when running with db_config
+        let db_manager = DbConfigManager::new(db_path)?;
+        db_manager.save_config(&args.db_config_name, &config)?;
+    }
+
     match determine_run_mode(&config, &args) {
         RunMode::Undetermine => panic!("Cannot determine running as a server or a client"),
         RunMode::Client => {

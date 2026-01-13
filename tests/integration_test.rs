@@ -40,7 +40,7 @@ fn init() {
 async fn tcp() -> Result<()> {
     init();
 
-    // Spawn a echo server
+    // Spawn an echo server
     tokio::spawn(async move {
         if let Err(e) = common::tcp::echo_server(ECHO_SERVER_ADDR).await {
             panic!("Failed to run the echo server for testing: {:?}", e);

@@ -42,7 +42,7 @@ cargo Features:      {}
 #[clap(group(
             ArgGroup::new("cmds")
                 .required(true)
-                .args(&["CONFIG", "genkey"]),
+                .args(&["CONFIG", "genkey", "db-config"]),
         ))]
 pub struct Cli {
     /// The path to the configuration file
@@ -51,6 +51,14 @@ pub struct Cli {
     /// according to the configuration file.
     #[clap(parse(from_os_str), name = "CONFIG")]
     pub config_path: Option<std::path::PathBuf>,
+
+    /// Database configuration path
+    #[clap(long, value_name = "DB_PATH")]
+    pub db_config: Option<std::path::PathBuf>,
+
+    /// Name of the configuration in the database
+    #[clap(long, value_name = "CONFIG_NAME", default_value = "default")]
+    pub db_config_name: String,
 
     /// Run as a server
     #[clap(long, short, group = "mode")]
