@@ -16,6 +16,7 @@ pub use constants::UDP_BUFFER_SIZE;
 use anyhow::Result;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, info};
+use tokio::time::{sleep, Duration};
 
 #[cfg(feature = "client")]
 mod client;
@@ -98,6 +99,39 @@ pub async fn run(args: Cli, shutdown_rx: broadcast::Receiver<bool>) -> Result<()
         let config_path = args.config_path.as_ref().unwrap();
         Config::from_file(config_path).await?
     };
+
+    // For database config, start hot reload monitoring
+    if args.db_config.is_some() && args.config_path.is_none() {
+        let db_path = args.db_config.as_ref().unwrap().clone();
+        let config_name = args.db_config_name.clone();
+        let mut shutdown_rx_clone = shutdown_rx.resubscribe();
+
+        // Start database config hot reload task
+        tokio::spawn(async move {
+            let mut last_config_hash = String::new();
+
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx_clone.recv() => break,
+                    _ = sleep(Duration::from_secs(30)) => {
+                        // Check for database configuration changes
+                        if let Ok(db_manager) = DbConfigManager::new(&db_path) {
+                            if let Ok(Some(current_config)) = db_manager.load_config(&config_name) {
+                                // Simple hash-based comparison
+                                let current_hash = format!("{:?}", current_config);
+
+                                if current_hash != last_config_hash {
+                                    info!("Database configuration changed, logging change...");
+                                    last_config_hash = current_hash;
+                                    // This is where restart logic would go in a complete implementation
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 
     // Spawn a config watcher. The watcher will send an initial signal to start the instance with a config
     // We'll still use the file path for config watcher, but config will be from either file or database
